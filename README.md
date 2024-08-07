@@ -3,4 +3,4 @@ Cross Platform desteği mevcuttur. İsteğe bağlı IOS, MacOS gibi işletim sis
 Web'e taşınabilir.
 Playstore, Appstore gibi uygulama marketlerinde yayınlanabilir.
 
-<image src="" />
+<image src="https://github.com/akoc95/Anket-Uygulamasi-Android-Windows/blob/master/SurveyApp/Anket-Uygulamasi.png" />
