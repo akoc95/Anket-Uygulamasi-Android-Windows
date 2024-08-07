@@ -1,0 +1,153 @@
+﻿@page "/create-survey"
+@inject QuestionService questionService
+@inject SurveyService surveyService
+@inject PreferencesService prefService
+
+<!-- Yeni Anket Kaydı oluşturmak için -->
+<EditForm Model="@survey" OnValidSubmit="Submit">
+    <div class="mt-2 col-12">
+        <div class="form-group">
+            <input type="text" class="form-control shadow-none mb-2" @bind-value="survey.Title" placeholder="Anket Adı" required maxlength="70"/>
+
+
+            @if (questionList is null)
+            {
+                <p>Sorular yükleniyor...</p>
+            }
+
+            else
+            {
+                <select class="form-select" multiple @onchange="OnQuestionSelectionChanged" required>
+                    @foreach (var question in questionList)
+                    {
+                        <option value="@question.Id">@question.Name</option>
+                    }
+                </select>
+            }
+
+            <button class="btn btn-primary container-fluid mt-2" type="submit">
+                Anketi Kaydet
+            </button>
+        </div>
+    </div>
+</EditForm>
+
+@if (surveyList is null)
+{
+    <p>Yükleniyor...</p>
+}
+
+else
+{
+    <div class="d-flex col-12 justify-content-center mt-3">
+        <div class="row" id="tblColor">
+            <span class="bg-light rounded-circle" @onclick='() => ChangeColor("light")'></span>
+            <span class="rounded-circle" @onclick='() => ChangeColor("green")' style="background-color:#D5E8D4; color:#D5E8D4;">.</span>
+            <span class="rounded-circle" @onclick='() => ChangeColor("blue")' style="background-color:#E1EBF2;"></span>
+            <span class="rounded-circle" @onclick='() => ChangeColor("pink")' style="background-color:#ffe0e0"></span>
+        </div>
+    </div>
+
+    <div class="table-responsive mt-3 mb-3">
+        <table id="tbl" class="table text-center align-middle table-striped" style="background-color: @tableColor">
+            <thead>
+                <tr>
+                    <th class="text-start">Anket Adı</th>
+                    <th>Soru</th>
+                    <th>İşlem</th>
+                </tr>
+
+            </thead>
+            <tbody>
+                @foreach (var survey in surveyList)
+                {
+                    <tr>
+                        <td class="text-start">@(survey.Title.Length > 29 ? $"{survey.Title.Substring(0, 29)}.." : survey.Title)</td>
+                        <td>@survey.Questions.Count</td>
+                        <td>
+                            <button class="badge text-dark fw-normal shadow-lg" @onclick="@(() => Delete(survey))" style="background:#ff9797;">Sil</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+@code {
+
+    private Survey survey = new Survey();
+    private List<Question> questionList;
+    private List<Survey> surveyList;
+    private string tableColor = "#F2F2F2; color:black;";
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetQuestions();
+        tableColor = prefService.LoadColor();
+
+    }
+
+    private async Task Submit()
+    {
+        await surveyService.Add(survey);
+        survey = new Survey();
+        await GetQuestions();
+    }
+
+
+
+    private async Task GetQuestions()
+    {
+        questionList = await questionService.GetAll();
+        surveyList = await surveyService.GetAll();
+
+    }
+
+    private void OnQuestionSelectionChanged(ChangeEventArgs selectedItem)
+    {
+        survey.Questions.Clear();
+        var selectedOptionIds = selectedItem.Value as string[];
+        if (selectedOptionIds != null)
+        {
+            foreach (var optionId in selectedOptionIds)
+            {
+                if (int.TryParse(optionId, out int id))
+                {
+                    var selectedQuestion = questionList.FirstOrDefault(q => q.Id == id);
+                    if (selectedQuestion != null)
+                    {
+                        survey.Questions.Add(selectedQuestion);
+                    }
+                }
+            }
+        }
+    }
+
+    private async Task Delete(Survey survey)
+    {
+        bool confirmation = await Application.Current.MainPage.DisplayAlert("Uyarı", "Silmek istediğinize emin misiniz?", "Evet", "Hayır");
+        if (confirmation)
+        {
+            surveyService.Delete(survey);
+            await GetQuestions();
+        }
+
+    }
+
+    private void ChangeColor(string color)
+    {
+        tableColor = color switch
+        {
+            "green" => "#D5E8D4;color:black;",
+            "light" => "#F2F2F2;color:black;",
+            "blue" => "#E1EBF2; color: black;",
+            "pink" => "#ffe0e0; color: black !important;",
+            _ => "#F2F2F2; color: black;"
+        };
+
+        prefService.SaveColor(tableColor);
+
+
+    }
+}

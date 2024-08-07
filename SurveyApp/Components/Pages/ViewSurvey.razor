@@ -1,0 +1,281 @@
+﻿@page "/view-survey/{surveyId:int}"
+@using ClosedXML.Excel;
+@using CommunityToolkit.Maui.Alerts
+@inject SurveyService surveyService
+
+<div class="table-responsive">
+
+    <!-- Ölçütler Tablosu -->
+    <table class="table table-striped table-bordered table-hover table-light">
+        <thead>
+            <tr>
+                <th>Ölçütler</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (surveyResponses.Count == 0)
+            {
+                <tr>
+                    <td>Veri yükleniyor.</td>
+                </tr>
+            }
+            else
+            {
+                foreach (var item in surveyResponses.Select(s => s.SurveyAnswers).First())
+                {
+                    <tr>
+                        <td>@item.Question.Name</td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+
+    <!-- Dereceler Tablosu -->
+    <table class="table table-striped table-bordered table-hover table-light text-center">
+        <thead>
+            <tr class="text-center">
+                <th colspan="12">Dereceler</th>
+            </tr>
+            <tr>
+                @if (questionAnswerNames.Count == 0)
+                {
+                    <th>Veri yükleniyor.</th>
+                }
+                else
+                {
+                    foreach (var item in questionAnswerNames)
+                    {
+                        <th>@item</th>
+                    }
+                }
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                @if (questionAnswerPoints.Count == 0)
+                {
+                    <th>Veri yükleniyor.</th>
+                }
+                else
+                {
+                    foreach (var item in questionAnswerPoints)
+                    {
+                        <td>@item</td>
+                    }
+                }
+            </tr>
+        </tbody>
+    </table>
+
+    @if (surveyResponses.Count == 0)
+    {
+        <p>Bu kategoriye ait anket bulunmuyor.</p>
+    }
+    else
+    {
+        <table class="table table-striped table-bordered table-hover table-light text-center align-middle">
+            <thead>
+                <tr>
+                    <th colspan="12">Ankete Katılanlar</th>
+                </tr>
+                <tr class="text-center">
+                    <th>Ad Soyad</th>
+                    <th>İşlemler</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var survey in surveyResponses)
+                {
+                    <tr>
+                        <td>@survey.CustomerFullName</td>
+                        <td><button class="btn btn-danger mb-1 box-shadow-none" @onclick="@(() => Delete(survey))">Sil</button></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    <button class="btn btn-secondary container-fluid" @onclick="ExportToExcel">Excel Çıktısı Al</button>
+
+</div>
+
+@code {
+    [Parameter]
+    public int surveyId { get; set; }
+
+    // Excel dosyası adlandırmak için guid üret
+    private Guid guid;
+
+    // Excel dosyası font-size
+    private double fontSize = 16;
+
+    private List<SurveyResponse> surveyResponses;
+    // Soruların cevapları ile bir tablo oluşturmak için
+    private List<string> questionAnswerNames;
+    private List<string> questionAnswerPoints;
+    private List<Question> GetSurveyQuestions;
+
+    protected override async Task OnInitializedAsync()
+    {
+        surveyResponses = await surveyService.GetSurveyByMainId(surveyId);
+        questionAnswerNames = await surveyService.GetSurveyAnswers(surveyId);
+        questionAnswerPoints = await surveyService.GetSurveyPoints(surveyId);
+        GetSurveyQuestions = await surveyService.GetSurveyQuestions(surveyId);
+    }
+
+    private async Task Delete(SurveyResponse surveyResponse)
+    {
+        bool confirmation = await Application.Current.MainPage.DisplayAlert("Uyarı", "Silmek istediğinize emin misiniz?", "Evet", "Hayır");
+        if (confirmation)
+        {
+            await surveyService.Delete2(surveyResponse);
+            await OnInitializedAsync();
+        }
+    }
+
+    private async Task ExportToExcel()
+    {
+        guid = Guid.NewGuid();
+        string externalStoragePath = "/storage/emulated/0/Download/";
+        string excelFilePath = Path.Combine(externalStoragePath, $"{guid}.xlsx");
+
+        var criteriaData = surveyResponses.Select(s => s.SurveyAnswers.Select(a => a.Question.Name).ToList()).FirstOrDefault();
+        var degreesData = new List<string> { }.Concat(questionAnswerNames).ToList();
+        var pointsData = questionAnswerPoints;
+        var surveyData = surveyResponses.Select(s => new List<string> { s.CustomerFullName }.Concat(s.SurveyAnswers.Select(a => a.Answer.Point.ToString())).ToList()).ToList();
+
+        ExportTableToExcel(excelFilePath, criteriaData, degreesData, pointsData, surveyData);
+    }
+
+    public void ExportTableToExcel(string filePath, List<string> criteriaData, List<string> degreesData, List<string> pointsData, List<List<string>> surveyData)
+    {
+        try
+        {
+            using (var workbook = new XLWorkbook())
+            {
+                var worksheet = workbook.Worksheets.Add("Anket Verisi");
+
+                int currentRow = 1;
+
+                // Method to style header cells
+                void StyleHeader(IXLCell cell)
+                {
+                    cell.Style.Fill.BackgroundColor = XLColor.Yellow;
+                    cell.Style.Font.Bold = true;
+                    cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                    cell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+                    cell.Style.Border.OutsideBorder = XLBorderStyleValues.Thick;
+                }
+
+                // Method to style data cells
+                void StyleDataCell(IXLCell cell)
+                {
+                    cell.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+                    cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                    cell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+                    cell.Style.Font.FontName = "Montserrat";
+                    cell.Style.Font.FontSize = 11;
+                }
+
+                // Method to apply alternating row styles
+                void ApplyAlternatingRowStyles(IXLRow row, bool isOdd)
+                {
+                    if (isOdd)
+                    {
+                        row.Style.Fill.BackgroundColor = XLColor.LightGray;
+                    }
+                }
+
+                // Set column widths to fit content
+                worksheet.Columns().AdjustToContents();
+
+                // Fill Criteria Data
+                if (criteriaData != null)
+                {
+                    var criteriaHeader = worksheet.Cell(currentRow, 1);
+                    criteriaHeader.Value = "Ölçütler";
+                    StyleHeader(criteriaHeader);
+                    currentRow++;
+                    for (int i = 0; i < criteriaData.Count; i++)
+                    {
+                        var cell = worksheet.Cell(currentRow + i, 1);
+                        cell.Value = criteriaData[i];
+                        StyleDataCell(cell);
+                        ApplyAlternatingRowStyles(worksheet.Row(currentRow + i), (currentRow + i) % 2 == 1);
+                    }
+                    currentRow += criteriaData.Count + 2; // Add extra space after the table
+                }
+
+                // Fill Degrees Data
+                if (degreesData.Count > 1)
+                {
+                    var degreesHeader = worksheet.Cell(currentRow, 1);
+                    degreesHeader.Value = "Dereceler";
+                    StyleHeader(degreesHeader);
+                    currentRow++;
+                    for (int i = 0; i < degreesData.Count; i++)
+                    {
+                        var cell = worksheet.Cell(currentRow, i + 1);
+                        cell.Value = degreesData[i];
+                        StyleHeader(cell);
+                    }
+                    currentRow++;
+                    for (int i = 0; i < pointsData.Count; i++)
+                    {
+                        var cell = worksheet.Cell(currentRow, i + 1);
+                        cell.Value = pointsData[i];
+                        StyleDataCell(cell);
+                        ApplyAlternatingRowStyles(worksheet.Row(currentRow), currentRow % 2 == 1);
+                    }
+                    currentRow += 3; // Add extra space after the table
+                }
+
+                // Fill Survey Data
+                var surveyHeader = worksheet.Cell(currentRow, 1);
+                surveyHeader.Value = "Anketler";
+                StyleHeader(surveyHeader);
+                currentRow++;
+                var cellAdSoyad = worksheet.Cell(currentRow, 1);
+                cellAdSoyad.Value = "Ad Soyad";
+                StyleHeader(cellAdSoyad);
+                for (int i = 1; i < surveyData.FirstOrDefault()?.Count; i++)
+                {
+                    var cell = worksheet.Cell(currentRow, i + 1);
+                    cell.Value = $"Madde {i}";
+                    StyleHeader(cell);
+                }
+
+                currentRow++;
+
+                for (int rowIndex = 0; rowIndex < surveyData.Count; rowIndex++)
+                {
+                    var row = surveyData[rowIndex];
+                    for (int colIndex = 0; colIndex < row.Count; colIndex++)
+                    {
+                        var cell = worksheet.Cell(currentRow + rowIndex, colIndex + 1);
+                        cell.Value = row[colIndex];
+                        StyleDataCell(cell);
+                    }
+                    ApplyAlternatingRowStyles(worksheet.Row(currentRow + rowIndex), (currentRow + rowIndex) % 2 == 1);
+                }
+
+                workbook.SaveAs(filePath);
+            }
+            
+            
+            var toast = Toast.Make("Veriler excel'e başarı ile aktarıldı.", CommunityToolkit.Maui.Core.ToastDuration.Short, fontSize);
+            toast.Show();
+
+        }
+        catch (Exception ex)
+        {
+            var toast = Toast.Make($"Hata: {ex}", CommunityToolkit.Maui.Core.ToastDuration.Short, fontSize);
+            toast.Show();
+
+        }
+    }
+
+
+
+}

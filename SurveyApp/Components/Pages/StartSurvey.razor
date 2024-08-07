@@ -1,0 +1,129 @@
+﻿@page "/start-survey"
+@using CommunityToolkit.Maui.Alerts
+@inject SurveyService surveyService;
+
+<label class="form-label">Anket seçiniz</label>
+
+
+
+<EditForm Model="@surveyResponse" OnValidSubmit="Submit">
+    <div class="mt-2 mb-3">
+        <div class="form-group">
+            <select class="form-select" @onchange="GetSurveyById" required>
+                <option value="0" disabled selected hidden>Lütfen anket seçimi yapınız.</option>
+                @foreach (var survey in surveyList)
+                {
+                    <option value="@survey.Id">@survey.Title</option>
+                }
+            </select>
+            <input type="text" class="form-control shadow-none mt-2 mb-2" @bind="surveyResponse.CustomerFullName" placeholder="Ad Soyad" required hidden="@isHidden" />
+
+            <div class="p-3 rounded-3 text-muted shadow-lg" hidden="@isHidden" style="background:#E1EBF2;">
+                @if (survey.Questions is not null)
+                {
+                    @foreach (var question in survey.Questions)
+                    {
+                        <div class="form-group" id="survey-question">
+                            <div class="survey-div"><span class="text-danger">Madde @counter </span> @question.Name</div>
+                            <div class="mb-3">
+
+                                @foreach (var option in question.Answers)
+                                {
+                                    <input type="radio" value="@option.Id" name="question_@question.Id" class="form-check-input text-start" @onchange="e => OnAnswerSelected(question.Id, int.Parse(e.Value.ToString()))" required />
+                                    <label id="survey-answer" class="form-check-label me-3">@option.Title</label>
+
+                                    <br />
+                                }
+                            </div>
+
+                        </div>
+
+                        counter++;
+                    }
+                }
+            </div>
+        </div>
+        <button class="btn btn-primary container-fluid mt-1" type="submit">Anketi Bitir</button>
+
+    </div>
+</EditForm>
+
+@code {
+    private List<Survey> surveyList;
+    private Survey survey = new Survey();
+    private SurveyResponse surveyResponse = new SurveyResponse();
+    private bool isHidden = true;
+    private int counter = 1;
+    private double fontSize = 16;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        surveyList = await surveyService.GetAll();
+    }
+
+    private async Task GetSurveyById(ChangeEventArgs selectedItem)
+    {
+        counter = 1;
+        isHidden = false;
+
+        var selectedSurveyId = int.Parse(selectedItem.Value as string);
+
+        if (selectedSurveyId > 0)
+        {
+            survey = await surveyService.GetById(selectedSurveyId);
+            surveyResponse.SurveyId = selectedSurveyId;
+
+        }
+
+        else
+        {
+            survey = new Survey();
+            surveyResponse = new SurveyResponse();
+
+        }
+
+
+    }
+
+    private void OnAnswerSelected(int questionId, int answerId)
+    {
+        counter = 1;
+
+        var existingAnswer = surveyResponse.SurveyAnswers.FirstOrDefault(a => a.QuestionId == questionId);
+        if (existingAnswer != null)
+        {
+            existingAnswer.AnswerId = answerId;
+        }
+        else
+        {
+            surveyResponse.SurveyAnswers.Add(new SurveyAnswer
+                {
+                    QuestionId = questionId,
+                    AnswerId = answerId
+                });
+        }
+    }
+
+    private async Task Submit()
+    {
+        var submit = await surveyService.SubmitSurveyResponse(surveyResponse);
+        surveyResponse = new SurveyResponse();
+        survey = new Survey();
+        isHidden = true;
+        counter = 1;
+
+        if (submit)
+        {
+            var toast = Toast.Make("Anket başarı ile kayıt edildi.", CommunityToolkit.Maui.Core.ToastDuration.Short, fontSize);
+            toast.Show();
+        }
+
+        else
+        {
+            var toast = Toast.Make("Anket eklenirken bir hata oluştu.", CommunityToolkit.Maui.Core.ToastDuration.Short, fontSize);
+            toast.Show();
+        }
+    }
+
+}

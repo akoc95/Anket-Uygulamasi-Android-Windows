@@ -1,0 +1,169 @@
+﻿@page "/create-question"
+@inject AnswerService answerService
+@inject QuestionService questionService
+@inject PreferencesService prefService
+
+
+<div class="container col-12">
+    <div class="row">
+        <!-- Yeni Soru Kaydı oluşturmak için -->
+        <EditForm Model="@question" OnValidSubmit="Submit">
+            <div class="mt-2">
+                <div class="form-group col-12">
+                    <input type="text" class="form-control shadow-none mb-2" @bind-value="question.Name" placeholder="Soru giriniz." required maxlength="70" />
+
+
+                    @if (answerList is null)
+                    {
+                        <p>Cevaplar yükleniyor...</p>
+                    }
+
+                    else
+                    {
+
+                        <select class="form-select" multiple @onchange="OnAnswerSelectionChanged" required>
+                            <option id="test" value="" disabled selected hidden>Bir veya daha fazla cevap seçiniz.</option>
+
+                            @foreach (var answer in answerList)
+                            {
+                                <option id="test" value="@answer.Id">@answer.Title</option>
+                            }
+                        </select>
+
+                    }
+                    <button class="btn btn-primary container-fluid mt-1" type="submit" hidden="@isHidden">
+                        Soru Ekle
+                    </button>
+                </div>
+            </div>
+        </EditForm>
+
+        @if (questionList is null)
+        {
+            <p class="text-center mt-3">Sorular Yükleniyor...</p>
+        }
+        else
+        {
+            <div class="d-flex col-12 justify-content-center mt-3">
+                <div class="row" id="tblColor">
+                    <span class="bg-light rounded-circle" @onclick='() => ChangeColor("light")'></span>
+                    <span class="rounded-circle" @onclick='() => ChangeColor("green")' style="background-color:#D5E8D4; color:#D5E8D4;">.</span>
+                    <span class="rounded-circle" @onclick='() => ChangeColor("blue")' style="background-color:#E1EBF2;"></span>
+                    <span class="rounded-circle" @onclick='() => ChangeColor("pink")' style="background-color:#ffe0e0"></span>
+
+                </div>
+            </div>
+            <!-- Cevapları Listelemek için -->
+            <div class="table-responsive mt-3 mb-3">
+                <table id="tbl" class="table table-striped align-middle text-center" style="background-color: @tableColor;">
+                    <thead>
+                        <tr>
+                            <th class="text-start">Soru</th>
+                            <th>Cevap</th>
+                            <th>İşlem</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var question in questionList)
+                        {
+                            <tr>
+                                <td class="text-start">@(question.Name.Length > 23 ? $"{question.Name.Substring(0, 23)}.." : question.Name)</td>
+                                <td>@question.Answers.Count</td>
+                                <td>
+                                    <button class="badge text-dark fw-normal shadow-lg" @onclick="@(() => Delete(question))" style="background:#ff9797;">Sil</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+@code {
+
+    private Question question = new Question();
+    private Question editingQuestion;
+    private bool isEditing = false;
+    private bool isHidden = true;
+    private List<Question> questionList;
+    private List<Answer> answerList;
+    private string tableColor = "#F2F2F2; color:black;";
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetQuestions();
+    }
+
+    private async Task GetQuestions()
+    {
+        questionList = await questionService.GetAll();
+        answerList = await answerService.GetAll();
+        tableColor = prefService.LoadColor();
+
+    }
+
+    private async Task Submit()
+    {
+        await questionService.Add(question);
+        question = new Question();
+        await OnInitializedAsync();
+        isHidden = true;
+    }
+
+    private async Task Delete(Question question)
+    {
+        bool confirmation = await Application.Current.MainPage.DisplayAlert("Uyarı", "Silmek istediğinize emin misiniz?", "Evet", "Hayır");
+        if (confirmation)
+        {
+            questionService.Delete(question);
+            await OnInitializedAsync();
+        }
+    }
+
+    private void OnAnswerSelectionChanged(ChangeEventArgs selectedItem)
+    {
+        question.Answers.Clear();
+
+        var selectedOptionIds = selectedItem.Value as string[];
+
+        if (selectedOptionIds.Length <= 0)
+        {
+            isHidden = true;
+        }
+
+        else
+        {
+            foreach (var optionId in selectedOptionIds)
+            {
+                if (int.TryParse(optionId, out int id))
+                {
+                    var selectedAnswer = answerList.FirstOrDefault(a => a.Id == id);
+                    if (selectedAnswer != null)
+                    {
+                        question.Answers.Add(selectedAnswer);
+                    }
+                }
+            }
+            isHidden = false;
+        }
+    }
+
+    private void ChangeColor(string color)
+    {
+        tableColor = color switch
+        {
+            "green" => "#D5E8D4;color:black;",
+            "light" => "#F2F2F2;color:black;",
+            "blue" => "#E1EBF2; color: black;",
+            "pink" => "#ffe0e0; color: black !important;",
+
+            _ => "#F2F2F2; color: black;"
+        };
+
+        prefService.SaveColor(tableColor);
+
+    }
+
+}

@@ -1,0 +1,57 @@
+﻿@page "/survey-view-all"
+@inject SurveyService surveyService
+@inject NavigationManager NavigationManager
+
+<h3>Yapılan Anketler</h3>
+
+@if (surveyResponses == null)
+{
+    <p>Yükleniyor...</p>
+}
+else if (!surveyResponses.Any())
+{
+    <p>Henüz yapılmış anket yok.</p>
+}
+else
+{
+
+
+    <table class="table table-striped table-bordered table-hover table-light">
+        <thead>
+            <tr>
+                <th>Anket Adı</th>
+
+            </tr>
+        </thead>
+        <tbody>
+
+            @foreach (var survey in surveyList)
+            {
+                <tr>
+                    <td @onclick="() => NavigateToViewDetail(survey.Id)">@survey.Title</td>
+                </tr>
+            }
+
+        </tbody>
+    </table>
+}
+
+
+
+
+@code {
+    private List<Survey> surveyList;
+
+    private List<SurveyResponse> surveyResponses;
+
+    protected override async Task OnInitializedAsync()
+    {
+        surveyList = await surveyService.GetAllRecords();
+        surveyResponses = await surveyService.GetSurveyResponses();
+    }
+
+    private void NavigateToViewDetail(int surveyId)
+    {
+        NavigationManager.NavigateTo($"/view-survey/{surveyId}");
+    }
+}

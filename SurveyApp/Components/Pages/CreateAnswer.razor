@@ -1,0 +1,132 @@
+﻿@page "/create-answer"
+@inject AnswerService answerService
+@inject PreferencesService prefService
+
+<!-- Create new answer -->
+<EditForm Model="@answer" OnValidSubmit="Submit">
+    <div class="mt-2">
+        <div class="form-group">
+            <input type="text" class="form-control shadow-none mt-2" @bind-value="answer.Title" placeholder="Örnek: Çok İyi" required maxlength="25"/>
+            <input type="text" class="form-control shadow-none mt-2" @bind-value="answer.Point" placeholder="Örnek: 4" required maxlength="10"/>
+            <button class="btn btn-primary container-fluid mt-1" type="submit" hidden="@isEditing">
+                Gönder
+            </button>
+            <button class="btn btn-warning container-fluid mt-1" type="submit" hidden="@(!isEditing)">
+                Güncelle
+            </button>
+        </div>
+    </div>
+</EditForm>
+
+@if (answerList == null)
+{
+    <p class="text-center mt-3">Cevaplar yükleniyor...</p>
+}
+else
+{
+    <div class="d-flex col-12 justify-content-center mt-3">
+        <div class="row" id="tblColor">
+            <span class="bg-light rounded-circle" @onclick='() => ChangeColor("light")'></span>
+            <span class="rounded-circle" @onclick='() => ChangeColor("green")' style="background-color:#D5E8D4; color:#D5E8D4;">.</span>
+            <span class="rounded-circle" @onclick='() => ChangeColor("blue")' style="background-color:#E1EBF2;"></span>
+            <span class="rounded-circle" @onclick='() => ChangeColor("pink")' style="background-color:#ffe0e0"></span>
+
+        </div>
+    </div>
+    <!-- Cevapları Listelemek için -->
+    <div class="table-responsive mt-3 mb-3">
+        <table id="tbl" class="table table-striped text-center align-middle" style="background-color: @tableColor">
+            <thead>
+                <tr>
+                    <th>Cevap</th>
+                    <th>Puan</th>
+                    <th>İşlemler</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var answer in answerList)
+                {
+                    <tr>
+                        <td>@(answer.Title.Length > 8 ? $"{answer.Title.Substring(0, 8)}.." : answer.Title)</td>
+                        <td>@(answer.Point.Length > 8 ? $"{answer.Point.Substring(0, 8)}.." : answer.Point)</td>
+
+                        <td>
+                            <button class="badge text-dark fw-normal shadow-lg" @onclick="@(() => Delete(answer))" style="background:#ff9797;">Sil</button>
+                            <button class="badge text-dark fw-normal" @onclick="@(() => Edit(answer))" style="background:#ffd682;">Düzenle</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+
+@code {
+    private Answer answer = new Answer();
+    private bool isEditing = false;
+    private List<Answer> answerList;
+    private string tableColor = "#F2F2F2; color:black !important;";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetAnswers();
+        tableColor = prefService.LoadColor();
+
+    }
+
+    private async Task GetAnswers()
+    {
+        answerList = await answerService.GetAll();
+    }
+
+    private async Task Submit()
+    {
+        if (isEditing)
+        {
+            await answerService.Update(answer);
+            isEditing = false;
+        }
+        else
+        {
+            await answerService.Add(answer);
+        }
+
+        answer = new Answer();
+        await GetAnswers();
+    }
+
+    private async Task Delete(Answer answer)
+    {
+        bool confirmation = await Application.Current.MainPage.DisplayAlert("Uyarı", "Silmek istediğinize emin misiniz?", "Evet", "Hayır");
+        if (confirmation)
+        {
+            await answerService.Delete(answer);
+            await GetAnswers();
+
+        }
+
+
+    }
+
+    private void Edit(Answer answer)
+    {
+        this.answer = new Answer { Id = answer.Id, Title = answer.Title, Point = answer.Point };
+        isEditing = true;
+    }
+
+    private void ChangeColor(string color)
+    {
+        tableColor = color switch
+        {
+            "green" => "#D5E8D4;color:black !important;",
+            "light" => "#F2F2F2;color:black !important;",
+            "blue" => "#E1EBF2; color: black !important;",
+            "pink" => "#ffe0e0; color: black !important;",
+
+            _ => "#F2F2F2; color: black !important;"
+        };
+
+        prefService.SaveColor(tableColor);
+    }
+}
