@@ -2,3 +2,5 @@ Anket yapabilmek için tasarlanmış basit bir uygulama. SQLite veritabanı kull
 Cross Platform desteği mevcuttur. İsteğe bağlı IOS, MacOS gibi işletim sistemlerinde de kullanılabilir.
 Web'e taşınabilir.
 Playstore, Appstore gibi uygulama marketlerinde yayınlanabilir.
+
+<image src="" />
